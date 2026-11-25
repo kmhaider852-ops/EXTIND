@@ -1,0 +1,140 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name=claude:viewport-fit-sides content=cover><style>:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-right:env(safe-area-inset-right,0px);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}</style><style>.md-table{overflow-x:auto}@media print{.md-table{overflow-x:visible}}</style><style>:root{color-scheme:light dark;--md-bg:#fff;--md-text:rgba(0,0,0,.8);--md-muted:rgba(0,0,0,.6);--md-fill:rgba(0,0,0,.04);--md-fill-strong:rgba(0,0,0,.06);--md-rule:rgba(0,0,0,.1);--md-rule-strong:rgba(0,0,0,.16);--md-link:hsl(210 100% 45%)}@media (prefers-color-scheme:dark){:root:where(:not([data-theme="light"])){--md-bg:#0d0d0d;--md-text:rgba(255,255,255,.85);--md-muted:rgba(255,255,255,.6);--md-fill:rgba(255,255,255,.06);--md-fill-strong:rgba(255,255,255,.09);--md-rule:rgba(255,255,255,.14);--md-rule-strong:rgba(255,255,255,.22);--md-link:hsl(210 100% 72%)}}:root[data-theme="dark"]{color-scheme:dark;--md-bg:#0d0d0d;--md-text:rgba(255,255,255,.85);--md-muted:rgba(255,255,255,.6);--md-fill:rgba(255,255,255,.06);--md-fill-strong:rgba(255,255,255,.09);--md-rule:rgba(255,255,255,.14);--md-rule-strong:rgba(255,255,255,.22);--md-link:hsl(210 100% 72%)}:root[data-theme="light"]{color-scheme:light}@media print{:root,:root[data-theme="dark"]{color-scheme:light;--md-bg:#fff;--md-text:rgba(0,0,0,.8);--md-muted:rgba(0,0,0,.6);--md-fill:rgba(0,0,0,.04);--md-fill-strong:rgba(0,0,0,.06);--md-rule:rgba(0,0,0,.1);--md-rule-strong:rgba(0,0,0,.16);--md-link:hsl(210 100% 45%)}}body{background:var(--md-bg);color:var(--md-text);max-width:720px;margin:0 auto;padding:32px;display:flex;flex-direction:column;gap:10px;font:14px/1.55 -apple-system,BlinkMacSystemFont,'SF Pro','Segoe UI',sans-serif;overflow-wrap:break-word}body>:first-child{margin-top:0}h1,h2,h3,h4,h5,h6{margin:6px 0 0;line-height:1.25;font-weight:600;text-wrap:balance}h1{font-size:1.35em}h2{font-size:1.15em;color:var(--md-muted)}h3,h4,h5,h6{font-size:1em}p,ul,ol,blockquote,table,pre,hr{margin:0}strong{font-weight:600}a{color:var(--md-link);text-decoration:none}a:hover{text-decoration:underline}ul,ol{display:flex;flex-direction:column;gap:6px;padding-inline-start:22px}ul{list-style:disc}ol{list-style:decimal}li[dir]{text-align:start}:is(li,td,th)>*+:is(p,ul,ol,blockquote){margin-top:6px}blockquote{display:flex;flex-direction:column;gap:10px;border-inline-start:2px solid var(--md-rule);padding-inline-start:10px;color:var(--md-muted)}:not(pre)>code{background:var(--md-fill);padding:1px 3px;border-radius:4px;font:.92em 'SF Mono',ui-monospace,Menlo,Consolas,monospace}a>code{background:none;color:inherit}pre{background:var(--md-fill);padding:10px 12px;border-radius:6px;overflow-x:auto;font:12px/1.5 'SF Mono',ui-monospace,Menlo,Consolas,monospace;margin-block:4px}pre code{background:none;padding:0;font:inherit}[dir=rtl] pre{direction:ltr;text-align:left}[dir=rtl] code{direction:ltr;unicode-bidi:isolate}table{width:100%;border-collapse:separate;border-spacing:2px;font:inherit}th,td{padding:6px 8px;border-radius:3px;text-align:start;vertical-align:top}th{background:var(--md-fill-strong);font-weight:600}td{background:var(--md-fill)}:is(th,td) :not(pre)>code{background:transparent}hr{border:0;border-top:1px solid var(--md-rule-strong);margin-block:10px}img{max-width:100%;height:auto;border-radius:4px}</style>
+</head><body>
+<h1>SMC Structure (LuxAlgo port) for Indie</h1>
+<p>Swing BOS/CHoCH are solid black lines and internal BOS/CHoCH are dashed lines, each from the pivot candle to the break candle with text in the middle. This version is untested. Paste it into the Exness Terminal indicator editor.</p>
+<p>Based on &quot;Smart Money Concepts&quot; by LuxAlgo (CC BY-NC-SA 4.0, non-commercial).</p>
+<pre><code class="language-python"># indie:lang_version = 5
+# Port of &#34;Smart Money Concepts&#34; by LuxAlgo (CC BY-NC-SA 4.0, non-commercial)
+# Swing (solid black) + Internal (dashed) BOS / CHoCH: line from pivot candle to break candle, text in the middle
+
+import math
+from indie import indicator, param, color, Var
+from indie.drawings import LineSegment, LabelAbs, AbsolutePosition
+from indie.algorithms import Highest, Lowest
+
+
+def structure(high_s: float, low_s: float, time_s: float, close_0: float, close_1: float,
+              hi: float, lo: float,
+              leg: Var[int], ph: Var[float], pl: Var[float],
+              ph_t: Var[float], pl_t: Var[float],
+              ph_crossed: Var[bool], pl_crossed: Var[bool],
+              trend: Var[int]) -&gt; int:
+    # event: 0 none, 1 bull BOS, 2 bull CHoCH, -1 bear BOS, -2 bear CHoCH
+    ev: int = 0
+    prev_leg: int = leg.get()
+    if high_s &gt; hi:
+        leg.set(0)
+    elif low_s &lt; lo:
+        leg.set(1)
+
+    if leg.get() != prev_leg:
+        if leg.get() == 1:
+            pl.set(low_s)
+            pl_t.set(time_s)
+            pl_crossed.set(False)
+        else:
+            ph.set(high_s)
+            ph_t.set(time_s)
+            ph_crossed.set(False)
+
+    if (not math.isnan(ph.get()) and not ph_crossed.get()
+            and close_0 &gt; ph.get() and close_1 &lt;= ph.get()):
+        if trend.get() == -1:
+            ev = 2
+        else:
+            ev = 1
+        ph_crossed.set(True)
+        trend.set(1)
+
+    if (not math.isnan(pl.get()) and not pl_crossed.get()
+            and close_0 &lt; pl.get() and close_1 &gt;= pl.get()):
+        if trend.get() == 1:
+            ev = -2
+        else:
+            ev = -1
+        pl_crossed.set(True)
+        trend.set(-1)
+
+    return ev
+
+
+@indicator(&#39;SMC Structure (LuxAlgo port)&#39;, overlay_main_pane=True)
+@param.int(&#39;swing_len&#39;, default=50, min=10, title=&#39;Swing Length&#39;)
+@param.int(&#39;internal_len&#39;, default=5, min=2, title=&#39;Internal Length&#39;)
+@param.bool(&#39;show_internal&#39;, default=True, title=&#39;Show Internal Structure&#39;)
+def Main(self, swing_len: int, internal_len: int, show_internal: bool):
+    hi_sw = Highest.new(self.high, swing_len)[0]
+    lo_sw = Lowest.new(self.low, swing_len)[0]
+    hi_in = Highest.new(self.high, internal_len)[0]
+    lo_in = Lowest.new(self.low, internal_len)[0]
+
+    s_leg = Var[int].new(0)
+    s_ph = Var[float].new(math.nan)
+    s_pl = Var[float].new(math.nan)
+    s_pht = Var[float].new(math.nan)
+    s_plt = Var[float].new(math.nan)
+    s_phc = Var[bool].new(True)
+    s_plc = Var[bool].new(True)
+    s_trend = Var[int].new(0)
+
+    i_leg = Var[int].new(0)
+    i_ph = Var[float].new(math.nan)
+    i_pl = Var[float].new(math.nan)
+    i_pht = Var[float].new(math.nan)
+    i_plt = Var[float].new(math.nan)
+    i_phc = Var[bool].new(True)
+    i_plc = Var[bool].new(True)
+    i_trend = Var[int].new(0)
+
+    s_ev: int = structure(self.high[swing_len], self.low[swing_len], self.time[swing_len],
+                          self.close[0], self.close[1], hi_sw, lo_sw,
+                          s_leg, s_ph, s_pl, s_pht, s_plt, s_phc, s_plc, s_trend)
+    i_ev: int = structure(self.high[internal_len], self.low[internal_len], self.time[internal_len],
+                          self.close[0], self.close[1], hi_in, lo_in,
+                          i_leg, i_ph, i_pl, i_pht, i_plt, i_phc, i_plc, i_trend)
+
+    now = self.time[0]
+
+    # ---------- SWING (thin solid black line, text in the middle) ----------
+    if s_ev != 0:
+        t1: float = s_plt.get()
+        lvl: float = s_pl.get()
+        if s_ev &gt; 0:
+            t1 = s_pht.get()
+            lvl = s_ph.get()
+        txt: str = &#39;BOS&#39;
+        if s_ev == 2 or s_ev == -2:
+            txt = &#39;CHoCH&#39;
+        self.chart.draw(LineSegment(AbsolutePosition(t1, lvl), AbsolutePosition(now, lvl), color=color.BLACK))
+        self.chart.draw(LabelAbs(txt, AbsolutePosition((t1 + now) / 2.0, lvl)))
+
+    # ---------- INTERNAL (dashed, max 40 dashes) ----------
+    if show_internal and i_ev != 0:
+        it1: float = i_plt.get()
+        ilvl: float = i_pl.get()
+        icol = color.RED(alpha=0.6)
+        if i_ev &gt; 0:
+            it1 = i_pht.get()
+            ilvl = i_ph.get()
+            icol = color.GREEN(alpha=0.6)
+        itxt: str = &#39;iBOS&#39;
+        if i_ev == 2 or i_ev == -2:
+            itxt = &#39;iCHoCH&#39;
+
+        total: float = now - it1
+        bar_len: float = self.time[0] - self.time[1]
+        dash_len: float = bar_len
+        if total / (2.0 * bar_len) &gt; 40.0:
+            dash_len = total / 80.0
+        n: int = int(total / (2.0 * dash_len))
+        if n &gt; 40:
+            n = 40
+        for k in range(n):
+            a: float = it1 + (2.0 * k) * dash_len
+            b: float = a + dash_len
+            self.chart.draw(LineSegment(AbsolutePosition(a, ilvl), AbsolutePosition(b, ilvl), color=icol))
+
+        self.chart.draw(LabelAbs(itxt, AbsolutePosition((it1 + now) / 2.0, ilvl), bg_color=icol))
+</code></pre>
+
+</body></html>
